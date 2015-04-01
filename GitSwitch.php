@@ -76,10 +76,10 @@ class GitSwitch
 		/**
 		 * Create request URL based on properties and current mode to fetch data from GitHub Issues API.
 		 */
-		// List Mode - Format: http://github.com/api/v2/json/issues/list/:user/:repo/open
+		// List Mode - Format: https://api.github.com/repos/:user/:repo/issues?state=open
 		if($mode == "list")
 		{
-			$requestURL = "http://github.com/api/v2/json/issues/list/" . $username . "/" . $repo . "/" . $state;
+			$requestURL = "https://api.github.com/repos/" . $username . "/" . $repo . "/issues?state=" . $state;
 		} // Label Mode - Format: http://github.com/api/v2/json/issues/list/:user/:repo/label/:label
 		  else if($mode == "label") {
 			$requestURL = "http://github.com/api/v2/json/issues/list/" . $username . "/" . $repo . "/label/" . $label;
@@ -91,21 +91,22 @@ class GitSwitch
 		/**
 		 * Create array of issues returned from the API query
 		 */
-		$issuesArray = self::query($requestURL);
+		$getJsonData = self::query($requestURL);
 		
+        $issuesArray = @json_decode($getJsonData);
 		/**
 		 * Parse JSON from array and format into PivotalTracker ready XML
 		 */
 		$xmlOutput = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
 		$xmlOutput .= "<external_stories type=\"array\">\n";
-		foreach($issuesArray['issues'] as &$issue) {
+		foreach($issuesArray as $issue) {
 			$xmlOutput .= "	<external_story>\n";
-			$xmlOutput .= "		<external_id>" . $issue['number'] . "</external_id>\n";
-			$xmlOutput .= "		<name>BUG " . $issue['title'] . "</name>\n";
-			$xmlOutput .= "		<description>" . $issue['body'] . " GitHub URL: " . $issue['html_url'] . "</description>\n";
+			$xmlOutput .= "		<external_id>" . $issue->number . "</external_id>\n";
+			$xmlOutput .= "		<name>BUG " . $issue->title . "</name>\n";
+			$xmlOutput .= "		<description>" . $issue->body . " GitHub URL: " . $issue->html_url . "</description>\n";
 			$xmlOutput .= "		<requested_by>" . $requester . "</requested_by>\n";
-			$xmlOutput .= "		<created_at type=\"datetime\">" . $issue['created_at'] . "</created_at>\n";
-			$xmlOutput .= "		<story_type>BUG</story_type>\n";
+			$xmlOutput .= "		<created_at type=\"datetime\">" . $issue->created_at . "</created_at>\n";
+			$xmlOutput .= "		<story_type>bug</story_type>\n";
 			$xmlOutput .= "		<estimate type=\"integer\">1</estimate>\n";
 			$xmlOutput .= "	</external_story>\n";
 		}
@@ -122,22 +123,16 @@ class GitSwitch
 	 */
 	private static function query($url)
 	{
-		/**
-		 * Initializes the class.
-		 */
-		self::init();
-		
-		/**
-		 * Catch the JSON Data
-		 */
-		$jsonData = file_get_contents($url);
-		
-		/**
-		 * Create data array from JSON data
-		 */
-		$jsonArray = json_decode($jsonData, true);
-		
-		return $jsonArray;
+	    $userAgent = "Awesome-Octocat-App"; // Provide an default userAgent. If you want you can replace it with your user agent name.
+		$ch = curl_init();
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_USERAGENT, $userAgent); 
+        curl_setopt($ch, CURLOPT_URL,$url);
+		$jsonData=curl_exec($ch);
+        curl_close($ch);
+        
+		return $jsonData;
 	}
 }
 
